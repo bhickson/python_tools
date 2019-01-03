@@ -1,13 +1,19 @@
 # Queries a ArcGIS Feature Service URL and returns features in block of value 'rq'. Get around for feature request limit.
 
-import urllib.request, os, json
+import urllib.request
+import os
+import json
+import argparse
 
-rq = 200  # request feature limit, varies by layer
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-s", "--service", help="specify arcgis service rest endpoint. e.g. https://myserver.com/arcgis/rest/services/folder/layers/0")
+parser.add_argument("-rl", "--request_limit", help="specify number of features to request at one time. Defaults to 200", default = 200)
+
+args = parser.parse_args()
+rq = args.request_limit
 
 # Variables
-server_url = "https://mapservices.nps.gov/arcgis/rest/services"
-service = "/WildlandFire/WildlandFire/MapServer"
-layer = "/4/"
 params = "query?where=1%3D1" \
            "&text=" \
            "&objectIds=" \
@@ -30,10 +36,9 @@ params = "query?where=1%3D1" \
            "&returnM=false" \
            "&gdbVersion=" \
            "&returnDistinctValues=false" \
-           "&f=pjson"
+           "&f=geojson"
 
-
-myRequest = server_url + service + layer + params
+myRequest = args.service + "/" + params
 response = urllib.request.urlopen(myRequest)
 string = response.read().decode('utf-8')
 json_obj = json.loads(string)
@@ -72,17 +77,21 @@ for id_list in id_lists:
     print("Starting list", lcount, " of ", len(id_lists))
     ids = ",".join(id_list)
 
-    query = server_url + service + layer + params
+    query = myRequest
     query = query.replace("objectIds=", "objectIds=" + ids).replace("&returnIdsOnly=true", "&returnIdsOnly=false")
 
-    feature_response = urllib.request.urlopen(query)
-    feature_json = json.load(feature_response)
-    if "features_json" in globals():
-        features = feature_json["features"]
-        for feat in features:
-            features_json["features"].append(feat)
-        features_json = feature_json
+    feature_subset_response = urllib.request.urlopen(query)
+    feature_json = json.load(feature_subset_response)
+    if "all_features" in globals():
+        subset_features = feature_json["features"]
+        for feat in subset_features:
+            all_features["features"].append(feat)
+    else:
+        all_features = feature_json
 
-with open("jsonOutput.json", "w") as jsonfile:
-    jsonString = json.dumps(features_json, indent=4, sort_keys=False)
+
+out_file = "jsonOutput.json"
+print(s"Writing to file {out_file}")
+with open(out_file, "w") as jsonfile:
+    jsonString = json.dumps(all_features, indent=4, sort_keys=False)
     jsonfile.write(jsonString)
